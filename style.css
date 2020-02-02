@@ -1,0 +1,14 @@
+body {
+    text-align: center;
+}
+
+@media print {
+    body {
+        text-decoration: underline;
+    }
+}
+
+/* This is an unused rule */
+h2 {
+    color: green;
+}
