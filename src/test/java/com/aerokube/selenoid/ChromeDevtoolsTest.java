@@ -272,7 +272,7 @@ class ChromeDevtoolsTest {
         HighlightConfig highlightConfig = new HighlightConfig();
         highlightConfig.setBorderColor(rgba(255, 229, 153, 0.66));
         highlightConfig.setContentColor(rgba(111, 168, 220, 0.66));
-        highlightConfig.setCssGridColor(rgb(75, 0, 130));
+        highlightConfig.setCssGridColor(rgba(75, 0, 130, 0));
         highlightConfig.setEventTargetColor(rgba(255, 196, 196, 0.66));
         highlightConfig.setMarginColor(rgba(246, 178, 107, 0.66));
         highlightConfig.setPaddingColor(rgba(147, 196, 125, 0.55));
@@ -294,11 +294,4 @@ class ChromeDevtoolsTest {
         return result;
     }
 
-    private static RGBA rgb(int r, int g, int b) {
-        RGBA result = new RGBA();
-        result.setR(r);
-        result.setG(g);
-        result.setB(b);
-        return result;
-    }
 }
