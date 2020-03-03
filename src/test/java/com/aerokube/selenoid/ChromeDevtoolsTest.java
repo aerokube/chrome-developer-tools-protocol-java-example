@@ -203,15 +203,6 @@ class ChromeDevtoolsTest {
                             .collect(Collectors.joining("; "))
                 )
         );
-        runtime.enable();
-
-        Page page = devtools.getPage();
-        navigate(page);
-    }
-
-    @Test
-    void testPrintConsoleExceptions() throws Exception {
-        Runtime runtime = devtools.getRuntime();
         runtime.onExceptionThrown(
                 e -> System.out.println(
                         e.getExceptionDetails().getException().getValue()
