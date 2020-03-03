@@ -4,11 +4,14 @@ import com.github.kklisura.cdt.protocol.commands.Runtime;
 import com.github.kklisura.cdt.protocol.commands.*;
 import com.github.kklisura.cdt.protocol.types.css.RuleUsage;
 import com.github.kklisura.cdt.protocol.types.css.SourceRange;
+import com.github.kklisura.cdt.protocol.types.dom.BoxModel;
 import com.github.kklisura.cdt.protocol.types.dom.RGBA;
 import com.github.kklisura.cdt.protocol.types.fetch.RequestPattern;
 import com.github.kklisura.cdt.protocol.types.network.Request;
 import com.github.kklisura.cdt.protocol.types.network.Response;
 import com.github.kklisura.cdt.protocol.types.overlay.HighlightConfig;
+import com.github.kklisura.cdt.protocol.types.page.LayoutMetrics;
+import com.github.kklisura.cdt.protocol.types.page.Viewport;
 import com.github.kklisura.cdt.services.ChromeDevToolsService;
 import com.github.kklisura.cdt.services.WebSocketService;
 import com.github.kklisura.cdt.services.config.ChromeDevToolsServiceConfiguration;
@@ -28,12 +31,16 @@ import java.net.URI;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.Base64;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.stream.Collectors;
 
 import static com.github.kklisura.cdt.protocol.types.network.ErrorReason.FAILED;
+import static com.github.kklisura.cdt.protocol.types.page.CaptureScreenshotFormat.PNG;
 
 class ChromeDevtoolsTest {
 
@@ -87,18 +94,31 @@ class ChromeDevtoolsTest {
         takeScreenshot(page, "testScreenshot.png");
     }
 
-    private void navigate(Page page) throws InterruptedException {
+    private static void navigate(Page page) throws InterruptedException {
+        navigate(page, URL);
+    }
+
+    private static void navigate(Page page, String url) throws InterruptedException {
         page.enable();
         CountDownLatch countDownLatch = new CountDownLatch(1);
         page.onLoadEventFired(e -> countDownLatch.countDown());
-        page.navigate(URL);
+        page.navigate(url);
         countDownLatch.await();
     }
 
-    private void takeScreenshot(Page page, String fileName) throws Exception {
+    private static void takeScreenshot(Page page, String fileName) throws Exception {
         String encodedScreenshot = page.captureScreenshot();
+        saveScreenshot(fileName, encodedScreenshot);
+    }
+
+    private static void takeScreenshot(Page page, String fileName, Viewport viewport) throws Exception {
+        String encodedScreenshot = page.captureScreenshot(PNG, 100, viewport, false);
+        saveScreenshot(fileName, encodedScreenshot);
+    }
+
+    private static void saveScreenshot(String fileName, String bytes) throws Exception {
         try (FileOutputStream fos = new FileOutputStream(fileName)) {
-            fos.write(Base64.getDecoder().decode(encodedScreenshot));
+            fos.write(Base64.getDecoder().decode(bytes));
             fos.flush();
         }
     }
@@ -204,6 +224,44 @@ class ChromeDevtoolsTest {
     }
 
     @Test
+    void testDOMManipulation() throws Exception {
+        DOM dom = devtools.getDOM();
+        dom.enable();
+
+        Page page = devtools.getPage();
+        navigate(page);
+
+        Integer img = dom.querySelector(dom.getDocument().getNodeId(), "img[alt=Chrome]");
+        dom.setOuterHTML(img, "<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed sed velit et sem pharetra sagittis. Sed enim erat, finibus et elementum a, rhoncus at elit.</p>");
+        takeScreenshot(page, "testUpdateDOM.png");
+    }
+
+    @Test
+    void testElementScreenshot() throws Exception {
+        DOM dom = devtools.getDOM();
+        dom.enable();
+
+        Page page = devtools.getPage();
+        navigate(page);
+
+        Integer img = dom.querySelector(dom.getDocument().getNodeId(), "img[alt=Chrome]");
+        BoxModel boxModel = dom.getBoxModel(img, 0, "");
+        List<Double> imgCoords = boxModel.getContent();
+        Viewport elementViewport = viewport(imgCoords.get(0), imgCoords.get(1), boxModel.getWidth(), boxModel.getHeight());
+        takeScreenshot(page, "testElementScreenshot.png", elementViewport);
+    }
+
+    private static Viewport viewport(double x, double y, double width, double height) {
+        Viewport viewport = new Viewport();
+        viewport.setX(x);
+        viewport.setY(y);
+        viewport.setScale(1d);
+        viewport.setWidth(width);
+        viewport.setHeight(height);
+        return viewport;
+    }
+
+    @Test
     void testCSSCoverage() throws Exception {
         DOM dom = devtools.getDOM();
         dom.enable();
@@ -252,6 +310,61 @@ class ChromeDevtoolsTest {
         navigate(page);
 
         takeScreenshot(page, "testAddCSSRule.png");
+    }
+
+    @Test
+    void testCSSMediaPrint() throws Exception {
+        Emulation emulation = devtools.getEmulation();
+        emulation.setEmulatedMedia("print");
+
+        Page page = devtools.getPage();
+        navigate(page);
+
+        takeScreenshot(page, "testCSSMediaPrint.png");
+    }
+
+    @Test
+    void testUserAgentOverride() throws Exception {
+        Page page = devtools.getPage();
+        navigate(page, "https://google.com/");
+        takeScreenshot(page, "testOriginalGoogleCom.png");
+
+        Emulation emulation = devtools.getEmulation();
+        String iPhoneUserAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 10_3_3 like Mac OS X) AppleWebKit/603.1.30 (KHTML, like Gecko) CriOS/61.0.3163.73 Mobile/14G60 Safari/602.1";
+        emulation.setUserAgentOverride(iPhoneUserAgent, "zh", "iOS");
+
+        navigate(page, "https://google.com/");
+        takeScreenshot(page, "testUserAgentOverride.png");
+    }
+
+    @Test
+    void testGeolocationOverride() throws Exception {
+        Emulation emulation = devtools.getEmulation();
+        emulation.setGeolocationOverride(37.774929, -122.419416, 0d);
+
+        Page page = devtools.getPage();
+        navigate(page, "https://browserleaks.com/geo");
+        takeScreenshot(page, "testGeolocationOverride.png");
+    }
+
+    @Test
+    void testHideScrollbars() throws Exception {
+        Page page = devtools.getPage();
+        navigate(page, "https://cnet.com/news/");
+        takeScreenshot(page, "testPageWithScrollbars.png");
+
+        Emulation emulation = devtools.getEmulation();
+        emulation.setScrollbarsHidden(true);
+
+        navigate(page, "https://cnet.com/news/");
+        takeScreenshot(page, "testPageWithoutScrollbars.png", fullPage(page));
+    }
+
+    private static Viewport fullPage(Page page) {
+        final LayoutMetrics layoutMetrics = page.getLayoutMetrics();
+        final double width = layoutMetrics.getContentSize().getWidth();
+        final double height = layoutMetrics.getContentSize().getHeight();
+        return viewport(0d, 0d, width, height);
     }
 
     @Test
