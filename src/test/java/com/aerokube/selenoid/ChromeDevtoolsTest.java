@@ -351,13 +351,6 @@ class ChromeDevtoolsTest {
         takeScreenshot(page, "testPageWithoutScrollbars.png");
     }
 
-    private static Viewport fullPage(Page page) {
-        final LayoutMetrics layoutMetrics = page.getLayoutMetrics();
-        final double width = layoutMetrics.getContentSize().getWidth();
-        final double height = layoutMetrics.getContentSize().getHeight();
-        return viewport(0d, 0d, width, height);
-    }
-
     @Test
     void testHighlightNode() throws Exception {
         Page page = devtools.getPage();
