@@ -112,7 +112,7 @@ class ChromeDevtoolsTest {
     }
 
     private static void takeScreenshot(Page page, String fileName, Viewport viewport) throws Exception {
-        String encodedScreenshot = page.captureScreenshot(PNG, 100, viewport, false);
+        String encodedScreenshot = page.captureScreenshot(PNG, 100, viewport, true);
         saveScreenshot(fileName, encodedScreenshot);
     }
 
