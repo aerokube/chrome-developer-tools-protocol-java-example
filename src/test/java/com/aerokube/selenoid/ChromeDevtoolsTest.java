@@ -348,7 +348,7 @@ class ChromeDevtoolsTest {
         emulation.setScrollbarsHidden(true);
 
         navigate(page, "https://cnet.com/news/");
-        takeScreenshot(page, "testPageWithoutScrollbars.png", fullPage(page));
+        takeScreenshot(page, "testPageWithoutScrollbars.png");
     }
 
     private static Viewport fullPage(Page page) {
