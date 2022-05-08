@@ -1,24 +1,17 @@
 package com.aerokube.selenoid;
 
-import com.github.kklisura.cdt.protocol.commands.Runtime;
-import com.github.kklisura.cdt.protocol.commands.*;
-import com.github.kklisura.cdt.protocol.types.css.RuleUsage;
-import com.github.kklisura.cdt.protocol.types.css.SourceRange;
-import com.github.kklisura.cdt.protocol.types.dom.BoxModel;
-import com.github.kklisura.cdt.protocol.types.dom.RGBA;
-import com.github.kklisura.cdt.protocol.types.fetch.RequestPattern;
-import com.github.kklisura.cdt.protocol.types.network.Request;
-import com.github.kklisura.cdt.protocol.types.network.Response;
-import com.github.kklisura.cdt.protocol.types.overlay.HighlightConfig;
-import com.github.kklisura.cdt.protocol.types.page.LayoutMetrics;
-import com.github.kklisura.cdt.protocol.types.page.Viewport;
-import com.github.kklisura.cdt.services.ChromeDevToolsService;
-import com.github.kklisura.cdt.services.WebSocketService;
-import com.github.kklisura.cdt.services.config.ChromeDevToolsServiceConfiguration;
-import com.github.kklisura.cdt.services.impl.ChromeDevToolsServiceImpl;
-import com.github.kklisura.cdt.services.impl.WebSocketServiceImpl;
-import com.github.kklisura.cdt.services.invocation.CommandInvocationHandler;
-import com.github.kklisura.cdt.services.utils.ProxyUtils;
+import io.github.sskorol.cdt.protocol.commands.Runtime;
+import io.github.sskorol.cdt.protocol.commands.*;
+import io.github.sskorol.cdt.protocol.types.css.RuleUsage;
+import io.github.sskorol.cdt.protocol.types.css.SourceRange;
+import io.github.sskorol.cdt.protocol.types.dom.BoxModel;
+import io.github.sskorol.cdt.protocol.types.dom.RGBA;
+import io.github.sskorol.cdt.protocol.types.fetch.RequestPattern;
+import io.github.sskorol.cdt.protocol.types.network.Request;
+import io.github.sskorol.cdt.protocol.types.network.Response;
+import io.github.sskorol.cdt.protocol.types.overlay.HighlightConfig;
+import io.github.sskorol.cdt.protocol.types.page.Viewport;
+import io.github.sskorol.cdt.services.ChromeDevToolsService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,8 +19,6 @@ import org.openqa.selenium.remote.DesiredCapabilities;
 import org.openqa.selenium.remote.RemoteWebDriver;
 
 import java.io.FileOutputStream;
-import java.lang.reflect.Method;
-import java.net.URI;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -39,8 +30,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.stream.Collectors;
 
-import static com.github.kklisura.cdt.protocol.types.network.ErrorReason.FAILED;
-import static com.github.kklisura.cdt.protocol.types.page.CaptureScreenshotFormat.PNG;
+import static io.github.sskorol.cdt.protocol.types.network.ErrorReason.FAILED;
+import static io.github.sskorol.cdt.protocol.types.page.CaptureScreenshotFormat.PNG;
+import static java.lang.String.format;
 
 class ChromeDevtoolsTest {
 
@@ -57,22 +49,7 @@ class ChromeDevtoolsTest {
         driver = new RemoteWebDriver(new URL("http://localhost:4444/wd/hub"), caps);
 
         // Init ChromeDevtools client
-        WebSocketService webSocketService = WebSocketServiceImpl.create(new URI(String.format("ws://localhost:4444/devtools/%s/page", driver.getSessionId())));
-        CommandInvocationHandler commandInvocationHandler = new CommandInvocationHandler();
-        Map<Method, Object> commandsCache = new ConcurrentHashMap<>();
-        devtools =
-                ProxyUtils.createProxyFromAbstract(
-                        ChromeDevToolsServiceImpl.class,
-                        new Class[] {WebSocketService.class, ChromeDevToolsServiceConfiguration.class},
-                        new Object[] {webSocketService, new ChromeDevToolsServiceConfiguration()},
-                        (unused, method, args) ->
-                                commandsCache.computeIfAbsent(
-                                        method,
-                                        key -> {
-                                            Class<?> returnType = method.getReturnType();
-                                            return ProxyUtils.createProxy(returnType, commandInvocationHandler);
-                                        }));
-        commandInvocationHandler.setChromeDevToolsService(devtools);
+        devtools = ChromeDevToolsService.from(format("ws://localhost:4444/devtools/%s/page", driver.getSessionId()));
     }
 
     @AfterEach
@@ -112,7 +89,7 @@ class ChromeDevtoolsTest {
     }
 
     private static void takeScreenshot(Page page, String fileName, Viewport viewport) throws Exception {
-        String encodedScreenshot = page.captureScreenshot(PNG, 100, viewport, true);
+        String encodedScreenshot = page.captureScreenshot(PNG, 100, viewport, true, true);
         saveScreenshot(fileName, encodedScreenshot);
     }
 
@@ -177,6 +154,7 @@ class ChromeDevtoolsTest {
                         e.getRequestId(),
                         200,
                         Collections.emptyList(),
+                        "application/octet-stream",
                         encodedFileContents,
                         "OK"
                 )
@@ -306,7 +284,7 @@ class ChromeDevtoolsTest {
     @Test
     void testCSSMediaPrint() throws Exception {
         Emulation emulation = devtools.getEmulation();
-        emulation.setEmulatedMedia("print");
+        emulation.setEmulatedMedia("print", Collections.emptyList());
 
         Page page = devtools.getPage();
         navigate(page);
@@ -322,7 +300,7 @@ class ChromeDevtoolsTest {
 
         Emulation emulation = devtools.getEmulation();
         String iPhoneUserAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 10_3_3 like Mac OS X) AppleWebKit/603.1.30 (KHTML, like Gecko) CriOS/61.0.3163.73 Mobile/14G60 Safari/602.1";
-        emulation.setUserAgentOverride(iPhoneUserAgent, "zh", "iOS");
+        emulation.setUserAgentOverride(iPhoneUserAgent, "zh", "iOS", null);
 
         navigate(page, "https://google.com/");
         takeScreenshot(page, "testUserAgentOverride.png");
@@ -360,6 +338,7 @@ class ChromeDevtoolsTest {
         Integer h1 = dom.querySelector(dom.getDocument().getNodeId(), "h1");
 
         Overlay overlay = devtools.getOverlay();
+        overlay.enable();
         overlay.highlightNode(highlightConfig(), h1, null, null, null);
 
         takeScreenshot(page, "testHighlightNode.png");
